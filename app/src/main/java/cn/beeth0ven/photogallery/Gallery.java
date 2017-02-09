@@ -11,13 +11,13 @@ import java.io.IOException;
 
 public class Gallery {
 
-    public String caption;
+    public String title;
     public String id;
     public String url;
 
     public Gallery(JSONObject json) throws JSONException {
         id = json.getString("id");
-        caption = json.getString("caption");
+        title = json.getString("title");
 
         if (json.has("url_s")) {
             url = json.getString("url_s");

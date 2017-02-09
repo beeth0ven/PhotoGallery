@@ -23,6 +23,7 @@ import java.io.IOException;
 public class PhotoGalleryFragment extends Fragment {
 
     private RecyclerView recyclerView;
+    private FlickrFetchr flickrFetchr = new FlickrFetchr();
 
     public static PhotoGalleryFragment newInstanse() {
         return new PhotoGalleryFragment();
@@ -33,9 +34,19 @@ public class PhotoGalleryFragment extends Fragment {
         super.onCreate(savedInstanceState);
         setRetainInstance(true);
 
-//         photos().subscribeOn(Schedulers.newThread())
-//                 .observeOn(AndroidSchedulers.mainThread())
-//                 .subscribe();
+        FlickrFetchr.galleries()
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        galleries -> {
+                            Log.d("RxJava", "onNext:" + galleries);
+                        },
+                        throwable -> {
+                            Log.d("RxJava", "onError:" + throwable);
+                        },
+                        () -> {
+                            Log.d("RxJava", "onComplete.");
+                        }
+                );
 
     }
 
