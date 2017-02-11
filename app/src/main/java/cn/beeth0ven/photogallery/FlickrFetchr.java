@@ -3,6 +3,9 @@ package cn.beeth0ven.photogallery;
 import android.net.Uri;
 import android.util.Log;
 
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -54,18 +57,10 @@ public class FlickrFetchr {
         return new String(getUrlBytes(urlSpec));
     }
 
-    public static Observable<List<Gallery>> galleries() {
+    public static Observable<List<Gallery>> galleries(int page) {
         Log.i("FlickrFetchr", "galleries");
         Observable<JSONObject> galleries = Observable.create(observer -> {
             try {
-//                String url = Uri.parse("https://api.flickr.com/services/rest/")
-//                        .buildUpon()
-//                        .appendQueryParameter("method", "flickr.photos.getRecent")
-//                        .appendQueryParameter("api_key", apiKey)
-//                        .appendQueryParameter("format", "json")
-//                        .appendQueryParameter("nojsoncallback", "1")
-//                        .appendQueryParameter("extras", "url_s")
-//                        .build().toString();
                 String url = Uri.parse("https://api.flickr.com/services/rest/")
                         .buildUpon()
                         .appendQueryParameter("method", "flickr.photos.getRecent")
@@ -73,13 +68,14 @@ public class FlickrFetchr {
                         .appendQueryParameter("format", "json")
                         .appendQueryParameter("nojsoncallback", "1")
                         .appendQueryParameter("extras", "url_s")
+                        .appendQueryParameter("page", String.valueOf(page))
                         .build().toString();
+                Log.i("FlickrFetchr", "Load Page: " + page);
                 Log.i("FlickrFetchr", "URL: " + url);
                 String jsonString = getUrlString(url);
                 JSONObject json = new JSONObject(jsonString);
                 observer.onNext(json);
                 observer.onComplete();
-                Log.i("FlickrFetchr", "Fetched contents of URL: ");
             } catch (IOException exception) {
                 observer.onError(exception);
                 Log.e("FlickrFetchr", "Failed to fetch URL: ", exception);
@@ -88,16 +84,12 @@ public class FlickrFetchr {
 
         return galleries
                 .map(json -> {
-                    JSONArray jsons = json.getJSONObject("photos")
-                            .getJSONArray("photo");
-
-                    List<Gallery> results = new ArrayList<Gallery>();
-                    for (int i = 0; i < jsons.length(); i++) {
-                        Gallery gallerie = new Gallery(jsons.getJSONObject(i));
-                        results.add(gallerie);
-                    }
+                    String jsonString = json.getJSONObject("photos")
+                            .getJSONArray("photo")
+                            .toString();
+                    Gson gson = new Gson();
+                    List<Gallery> results = gson.fromJson(jsonString, new TypeToken<List<Gallery>>(){}.getType());
                     Log.d("FlickrFetchr", "galleries count: " + results.size());
-                    Log.d("FlickrFetchr", "jsons: " + jsons);
                     return results;
                 }).subscribeOn(Schedulers.newThread());
     }
@@ -110,5 +102,3 @@ public class FlickrFetchr {
         return objects;
     }
 }
-
-

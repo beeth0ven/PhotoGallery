@@ -32,6 +32,7 @@ dependencies {
 //    compile 'com.jakewharton.rxbinding:rxbinding:1.0.0'
 //    compile 'com.jakewharton.rxbinding:rxbinding-recyclerview-v7:1.0.0'
 //    compile 'com.jakewharton.rxbinding:rxbinding-appcompat-v7:1.0.0'
+    compile 'com.google.code.gson:gson:2.8.0'
 }
 
 android {

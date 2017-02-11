@@ -1,5 +1,7 @@
 package cn.beeth0ven.photogallery;
 
+import com.google.gson.annotations.SerializedName;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -13,15 +15,7 @@ public class Gallery {
 
     public String title;
     public String id;
+    @SerializedName("url_s")
     public String url;
-
-    public Gallery(JSONObject json) throws JSONException {
-        id = json.getString("id");
-        title = json.getString("title");
-
-        if (json.has("url_s")) {
-            url = json.getString("url_s");
-        }
-    }
 
 }
