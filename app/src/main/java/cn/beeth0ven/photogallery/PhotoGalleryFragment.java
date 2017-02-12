@@ -18,7 +18,10 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.ViewTreeObserver.OnGlobalLayoutListener;
+import android.widget.ImageView;
 import android.widget.TextView;
+
+import com.squareup.picasso.Picasso;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -117,15 +120,18 @@ public class PhotoGalleryFragment extends Fragment {
 
     private class ViewHolder extends RecyclerView.ViewHolder {
 
-        private TextView textView;
+        private ImageView imageView;
 
         public ViewHolder(View itemView) {
             super(itemView);
-            textView = (TextView) itemView;
+            imageView = (ImageView) itemView;
         }
 
         public void bindGallery(Gallery gallery) {
-            textView.setText(gallery.title);
+            Picasso.with(getActivity())
+                    .load(gallery.url)
+                    .placeholder(R.drawable.bill_up_close)
+                    .into(imageView);
         }
     }
 
@@ -139,7 +145,9 @@ public class PhotoGalleryFragment extends Fragment {
 
         @Override
         public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-            return new ViewHolder(new TextView(getActivity()));
+            LayoutInflater inflater = LayoutInflater.from(getActivity());
+            View view = inflater.inflate(R.layout.image_view_cell, parent, false);
+            return new ViewHolder(view);
         }
 
         @Override
