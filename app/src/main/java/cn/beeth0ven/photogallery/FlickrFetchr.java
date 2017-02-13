@@ -16,9 +16,13 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import io.reactivex.Observable;
+import io.reactivex.Scheduler;
+import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.schedulers.Schedulers;
 
 /**
@@ -59,46 +63,66 @@ public class FlickrFetchr {
 
     public static Observable<List<Gallery>> galleries(int page) {
         Log.i("FlickrFetchr", "galleries");
-        Observable<JSONObject> galleries = Observable.create(observer -> {
-            try {
-                String url = Uri.parse("https://api.flickr.com/services/rest/")
-                        .buildUpon()
-                        .appendQueryParameter("method", "flickr.photos.getRecent")
-                        .appendQueryParameter("api_key", apiKey)
-                        .appendQueryParameter("format", "json")
-                        .appendQueryParameter("nojsoncallback", "1")
-                        .appendQueryParameter("extras", "url_s")
-                        .appendQueryParameter("page", String.valueOf(page))
-                        .build().toString();
-                Log.i("FlickrFetchr", "Load Page: " + page);
-                Log.i("FlickrFetchr", "URL: " + url);
-                String jsonString = getUrlString(url);
-                JSONObject json = new JSONObject(jsonString);
-                observer.onNext(json);
-                observer.onComplete();
-            } catch (IOException exception) {
-                observer.onError(exception);
-                Log.e("FlickrFetchr", "Failed to fetch URL: ", exception);
-            }
-        });
 
-        return galleries
+        Map<String, String> params = new HashMap();
+        params.put("method", "flickr.photos.getRecent");
+        params.put("page", String.valueOf(page));
+
+        return json(params)
                 .map(json -> {
                     String jsonString = json.getJSONObject("photos")
                             .getJSONArray("photo")
                             .toString();
-                    Gson gson = new Gson();
-                    List<Gallery> results = gson.fromJson(jsonString, new TypeToken<List<Gallery>>(){}.getType());
+                    List<Gallery> results = new Gson().fromJson(jsonString, new TypeToken<List<Gallery>>(){}.getType());
                     Log.d("FlickrFetchr", "galleries count: " + results.size());
                     return results;
-                }).subscribeOn(Schedulers.newThread());
+                });
     }
-    
-    private static List toList(JSONArray jsons) throws JSONException {
-        List objects = new ArrayList();
-        for (int i = 0; i < jsons.length(); i++) {
-            objects.add(jsons.get(i));
-        }
-        return objects;
+
+    public static Observable<List<Gallery>> searchGalleries(String text) {
+        Log.i("FlickrFetchr", "searchGalleries");
+
+        Map<String, String> params = new HashMap();
+        params.put("method", "flickr.photos.search");
+        params.put("text", text);
+
+        return json(params)
+                .map(json -> {
+                    String jsonString = json.getJSONObject("photos")
+                            .getJSONArray("photo")
+                            .toString();
+                    List<Gallery> results = new Gson().fromJson(jsonString, new TypeToken<List<Gallery>>(){}.getType());
+                    Log.d("FlickrFetchr", "galleries count: " + results.size());
+                    return results;
+                });
+    }
+
+    private static Observable<JSONObject> json(Map<String, String> params) {
+        Observable<JSONObject> result = Observable.create(observer -> {
+           try {
+               Uri.Builder builder = Uri.parse("https://api.flickr.com/services/rest/")
+                       .buildUpon()
+                       .appendQueryParameter("api_key", apiKey)
+                       .appendQueryParameter("format", "json")
+                       .appendQueryParameter("nojsoncallback", "1")
+                       .appendQueryParameter("extras", "url_s");
+
+               for (Map.Entry<String, String> entry: params.entrySet()) {
+                   builder.appendQueryParameter(entry.getKey(), entry.getValue());
+               }
+
+               String url = builder.build().toString();
+               Log.i("FlickrFetchr", "url: " + url);
+               String jsonString = getUrlString(url);
+               JSONObject json = new JSONObject(jsonString);
+               observer.onNext(json);
+               observer.onComplete();
+           } catch (IOException exception) {
+               observer.onError(exception);
+           }
+        });
+
+        return result.subscribeOn(Schedulers.newThread())
+                .observeOn(AndroidSchedulers.mainThread());
     }
 }
