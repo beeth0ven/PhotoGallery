@@ -3,8 +3,10 @@ package cn.beeth0ven.photogallery;
 import cn.beeth0ven.photogallery.RxExtension.ComputedVariable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
+import io.reactivex.schedulers.Schedulers;
 import io.reactivex.subjects.PublishSubject;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.support.annotation.Nullable;
@@ -40,7 +42,6 @@ public class PhotoGalleryFragment extends Fragment {
     private FlickrFetchr flickrFetchr = new FlickrFetchr();
     private List<Disposable> disposables = new ArrayList<Disposable>();
 //    private BehaviorSubject<Integer> currentPage = BehaviorSubject.createDefault(1);
-    private ComputedVariable<String> searchText;
     private PublishSubject<Integer> recycleViewWidth = PublishSubject.create();
     private boolean isLoading = false;
     private boolean isViewDidLoad = false;
@@ -56,18 +57,10 @@ public class PhotoGalleryFragment extends Fragment {
         setRetainInstance(true);
         setHasOptionsMenu(true);
 
-        searchText =  new ComputedVariable<String>(
-                () -> {
-                    return PreferenceManager.getDefaultSharedPreferences(getActivity())
-                            .getString("PhotoGalleryFragment.searchText", "");
-                },
-                newValue -> {
-                    PreferenceManager.getDefaultSharedPreferences(getActivity())
-                            .edit()
-                            .putString("PhotoGalleryFragment.searchText", newValue)
-                            .apply();
-                }
-        );
+
+
+        Intent intent = PollService.newInstanse(getActivity());
+        getActivity().startService(intent);
     }
 
     @Override
@@ -87,7 +80,7 @@ public class PhotoGalleryFragment extends Fragment {
         MenuItem searchMenuItem = menu.findItem(R.id.searchMenuItem);
         final SearchView searchView = (SearchView) searchMenuItem.getActionView();
 
-        searchView.setQuery(searchText.getValue(), false);
+        searchView.setQuery(QueryPreferences.searchText.getValue(), false);
         searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override
             public boolean onQueryTextSubmit(String query) {
@@ -97,7 +90,7 @@ public class PhotoGalleryFragment extends Fragment {
 
             @Override
             public boolean onQueryTextChange(String newText) {
-                searchText.setValue(newText);
+                QueryPreferences.searchText.setValue(newText);
                 return false;
             }
         });
@@ -122,33 +115,37 @@ public class PhotoGalleryFragment extends Fragment {
             })
         );
 
-        disposables.add(searchText.asObservable()
-                .filter(text -> !text.isEmpty())
-                .debounce(1, TimeUnit.SECONDS)
+        disposables.add(QueryPreferences.searchText.asObservable()
+                        .filter(text -> !text.isEmpty())
+                        .debounce(1, TimeUnit.SECONDS)
 //                .flatMap(FlickrFetchr::galleries)
-                .observeOn(AndroidSchedulers.mainThread())
-                .doOnNext(newText ->  {
-                    Log.d("PhotoGalleryFragment", "newText: " + newText);
-                    loadingTextView.setVisibility(View.VISIBLE);
-                    recyclerView.setVisibility(View.GONE);
-                })
-                .flatMap(FlickrFetchr::searchGalleries)
-                .subscribe(
-                        galleries -> {
-                            Log.d("RxJava", "onNext");
-                            galleryAdapter.galleries = galleries;
-                            galleryAdapter.notifyDataSetChanged();
-                            isLoading = false;
-                            loadingTextView.setVisibility(View.GONE);
-                            recyclerView.setVisibility(View.VISIBLE);
-                        },
-                        throwable -> {
-                            Log.d("RxJava", "onError:" + throwable);
-                        },
-                        () -> {
-                            Log.d("RxJava", "onComplete.");
-                        }
-                )
+                        .observeOn(AndroidSchedulers.mainThread())
+                        .doOnNext(newText ->  {
+                            Log.d("PhotoGalleryFragment", "newText: " + newText);
+                            loadingTextView.setVisibility(View.VISIBLE);
+                            recyclerView.setVisibility(View.GONE);
+                        })
+                        .flatMap(text -> {
+                            return FlickrFetchr.searchGalleries(text)
+                                    .subscribeOn(Schedulers.newThread())
+                                    .observeOn(AndroidSchedulers.mainThread());
+                        })
+                        .subscribe(
+                                galleries -> {
+                                    Log.d("RxJava", "onNext");
+                                    galleryAdapter.galleries = galleries;
+                                    galleryAdapter.notifyDataSetChanged();
+                                    isLoading = false;
+                                    loadingTextView.setVisibility(View.GONE);
+                                    recyclerView.setVisibility(View.VISIBLE);
+                                },
+                                throwable -> {
+                                    Log.d("RxJava", "onError:" + throwable);
+                                },
+                                () -> {
+                                    Log.d("RxJava", "onComplete.");
+                                }
+                        )
         );
 
 //        recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
@@ -184,7 +181,7 @@ public class PhotoGalleryFragment extends Fragment {
         public void bindGallery(Gallery gallery) {
             Picasso.with(getActivity())
                     .load(gallery.url)
-//                    .placeholder(R.drawable.bill_up_close)
+                    .placeholder(R.drawable.bill_up_close)
                     .into(imageView);
         }
     }

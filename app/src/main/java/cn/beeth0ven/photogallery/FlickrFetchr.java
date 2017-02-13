@@ -122,7 +122,6 @@ public class FlickrFetchr {
            }
         });
 
-        return result.subscribeOn(Schedulers.newThread())
-                .observeOn(AndroidSchedulers.mainThread());
+        return result;
     }
 }
