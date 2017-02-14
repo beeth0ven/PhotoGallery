@@ -1,6 +1,7 @@
 package cn.beeth0ven.photogallery;
 
 import cn.beeth0ven.photogallery.RxExtension.ComputedVariable;
+import io.reactivex.Observable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.schedulers.Schedulers;
@@ -57,10 +58,7 @@ public class PhotoGalleryFragment extends Fragment {
         setRetainInstance(true);
         setHasOptionsMenu(true);
 
-
-
-        Intent intent = PollService.newInstanse(getActivity());
-        getActivity().startService(intent);
+        PollService.setServiceAlarm(getActivity(), true);
     }
 
     @Override
@@ -94,6 +92,11 @@ public class PhotoGalleryFragment extends Fragment {
                 return false;
             }
         });
+
+        MenuItem togglePollingMenuItem = menu.findItem(R.id.togglePollingMenuItem);
+        int stringId = PollService.isServiceAlarmOn(getActivity()) ? R.string.stop_polling : R.string.start_polling;
+        togglePollingMenuItem.setTitle(stringId);
+
     }
 
     @Nullable
@@ -116,7 +119,6 @@ public class PhotoGalleryFragment extends Fragment {
         );
 
         disposables.add(QueryPreferences.searchText.asObservable()
-                        .filter(text -> !text.isEmpty())
                         .debounce(1, TimeUnit.SECONDS)
 //                .flatMap(FlickrFetchr::galleries)
                         .observeOn(AndroidSchedulers.mainThread())
@@ -126,6 +128,9 @@ public class PhotoGalleryFragment extends Fragment {
                             recyclerView.setVisibility(View.GONE);
                         })
                         .flatMap(text -> {
+                            if (text.isEmpty()) {
+                                return Observable.just(new ArrayList<Gallery>());
+                            }
                             return FlickrFetchr.searchGalleries(text)
                                     .subscribeOn(Schedulers.newThread())
                                     .observeOn(AndroidSchedulers.mainThread());
@@ -167,6 +172,23 @@ public class PhotoGalleryFragment extends Fragment {
         loadingTextView = (TextView) view.findViewById(R.id.loadingTextView);
 
         return view;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        Log.d("PhotoGalleryFragment", "onOptionsItemSelected: " + item.getItemId());
+        switch (item.getItemId()) {
+            case R.id.clearMenuItem:
+                QueryPreferences.searchText.setValue("");
+                return true;
+            case R.id.togglePollingMenuItem:
+                boolean shouldStartAlarm = !PollService.isServiceAlarmOn(getActivity());
+                PollService.setServiceAlarm(getActivity(), shouldStartAlarm);
+                getActivity().invalidateOptionsMenu();
+                return true;
+            default:
+                return super.onOptionsItemSelected(item);
+        }
     }
 
     private class ViewHolder extends RecyclerView.ViewHolder {
