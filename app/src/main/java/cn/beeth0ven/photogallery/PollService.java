@@ -16,15 +16,18 @@ import android.util.Log;
 import java.util.ArrayList;
 import java.util.List;
 
+import cn.beeth0ven.photogallery.RxExtension.MyVoid;
+import cn.beeth0ven.photogallery.RxExtension.RxNotification;
 import io.reactivex.Observable;
-import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
+import io.reactivex.subjects.PublishSubject;
 
 /**
  * Created by Air on 2017/2/13.
  */
 
 public class PollService extends IntentService {
+
 
     private List<Disposable> disposables = new ArrayList<Disposable>();
 
@@ -44,6 +47,8 @@ public class PollService extends IntentService {
             alarmManager.cancel(pendingIntent);
             pendingIntent.cancel();
         }
+
+        UserDefaults.isAlarmOn.setValue(isOn);
     }
 
     public static boolean isServiceAlarmOn(Context context) {
@@ -62,8 +67,8 @@ public class PollService extends IntentService {
             return;
         }
 
-        String searchText = QueryPreferences.searchText.getValue();
-        String lastResultId = QueryPreferences.lastResultId.getValue();
+        String searchText = UserDefaults.searchText.getValue();
+        String lastResultId = UserDefaults.lastResultId.getValue();
 
         Observable<List<Gallery>> galleries = searchText == "" ?
                 FlickrFetchr.galleries(1) :
@@ -74,28 +79,32 @@ public class PollService extends IntentService {
                     Log.i("PollService", "newGalleries");
                     if (newGalleries.size() == 0) { return; }
                     String resultId = newGalleries.get(0).id;
-                    String oldOrNew = resultId.equals(lastResultId) ? "old" : "new";
-                    Log.i("PollService", "Got " + oldOrNew + " result: " + resultId);
-                    QueryPreferences.lastResultId.setValue(resultId);
-                    QueryPreferences.searchText.setValue(QueryPreferences.searchText.getValue());
+                    if (resultId.equals(lastResultId)) {
+                        Log.i("PollService", "Got old result: " + resultId);
+                    } else {
+                        Log.i("PollService", "Got new result: " + resultId);
+                        Resources resources = getResources();
+                        Intent intent1 = PhotoGalleryActivity.newInstanse(this);
+                        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent1, 0);
+
+                        Notification notification = new NotificationCompat.Builder(this)
+                                .setTicker(resources.getString(R.string.new_pictures_text))
+                                .setSmallIcon(android.R.drawable.ic_menu_report_image)
+                                .setContentText(resources.getString(R.string.new_pictures_text))
+                                .setContentIntent(pendingIntent)
+                                .setAutoCancel(true)
+                                .build();
+
+                        NotificationManagerCompat notificationManagerCompat = NotificationManagerCompat.from(this);
+                        notificationManagerCompat.notify(0, notification);
+
+                        RxNotification.showNotification.onNext(MyVoid.instance);
+                    }
+
+                    UserDefaults.lastResultId.setValue(resultId);
                 }));
 
         Log.d("PollService", "onHandleIntent");
-
-        Resources resources = getResources();
-        Intent intent1 = PhotoGalleryActivity.newInstanse(this);
-        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent1, 0);
-
-        Notification notification = new NotificationCompat.Builder(this)
-                .setTicker(resources.getString(R.string.new_pictures_text))
-                .setSmallIcon(android.R.drawable.ic_menu_report_image)
-                .setContentText(resources.getString(R.string.new_pictures_text))
-                .setContentIntent(pendingIntent)
-                .setAutoCancel(true)
-                .build();
-
-        NotificationManagerCompat notificationManagerCompat = NotificationManagerCompat.from(this);
-        notificationManagerCompat.notify(0, notification);
     }
 
     private boolean isNetworkAvailableAndConnected() {
